@@ -1,18 +1,10 @@
-from flask import Flask, jsonify
-import threading
-from hardoff import main  # hardoff.py の main() を実行
+def log_message(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"- [{timestamp}] {message}"
+    
+    # Render の「Logs」タブに出力
+    print(log_entry, flush=True)
 
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Hardoff モニタリングシステムが稼働中！"
-
-@app.route("/start")
-def start_monitor():
-    thread = threading.Thread(target=main)
-    thread.start()
-    return jsonify({"message": "監視開始！"})
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    # ローカルファイルにもログを記録
+    with open(LOG_FILE, "a", encoding="utf-8") as log_file:
+        log_file.write(log_entry + "\n")
