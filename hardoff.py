@@ -14,6 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 import threading
+from flask import Flask, jsonify
 
 # 環境変数から API トークンとルーム ID を取得
 CHATWORK_API_TOKEN = os.getenv("CHATWORK_API_TOKEN")
@@ -34,7 +35,7 @@ first_run = True
 
 def log_message(message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"- [{timestamp}] {message.ljust(50)}"
+    log_entry = f"- [{timestamp}] {message}"
     print(log_entry, flush=True)  # Renderのログに出力
     with open(LOG_FILE, "a", encoding="utf-8") as log_file:
         log_file.write(log_entry + "\n")
@@ -97,27 +98,22 @@ def fetch_and_compare(url, site_name, first_run=False, timeout=20):
         log_message(traceback.format_exc())
         return None
 
-def monitor_site(site_name, url):
-    global first_run
-    while True:
-        log_message(f"🔍 {site_name} を巡回中...")
-        new_data = fetch_and_compare(url, site_name, first_run)
-        if new_data is not None:
-            previous_data[site_name] = new_data
-        if first_run:
-            log_message("🚀 初回記録完了。通常監視モードへ移行。")
-            first_run = False
-        time.sleep(30)
-
 def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futures = {executor.submit(monitor_site, site_name, config["url"]): site_name for site_name, config in URLS.items()}
-        for future in concurrent.futures.as_completed(futures):
-            site_name = futures[future]
-            try:
-                future.result()
-            except Exception as e:
-                log_message(f"❌ スレッドエラー ({site_name}): {e}")
+        for site_name, config in URLS.items():
+            executor.submit(fetch_and_compare, config["url"], site_name)
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Hardoff モニタリングシステムが稼働中！"
+
+@app.route("/start")
+def start_monitor():
+    thread = threading.Thread(target=main)
+    thread.start()
+    return jsonify({"message": "監視開始！"})
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=10000)
